@@ -22,7 +22,7 @@ jobs:
     - name: Set git identity (so commits are authored as Nam-I)
       run: |
         git config user.name "Nam-I"
-        git config user.email "jamong9669@naver.com"
+        git config user.email "71905358+Nam-I@users.noreply.github.com"
         # debug output (optional)
         git config --get user.name
         git config --get user.email
@@ -41,5 +41,5 @@ jobs:
       env:
         RSS_URL: 'https://api.velog.io/rss/@conam'
         GIT_COMMIT_NAME: 'Nam-I'
-        GIT_COMMIT_EMAIL: 'jamong9669@naver.com'
+        GIT_COMMIT_EMAIL: '71905358+Nam-I@users.noreply.github.com'
       run: python scripts/update_blog.py

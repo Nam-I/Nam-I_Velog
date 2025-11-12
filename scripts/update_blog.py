@@ -14,7 +14,7 @@ from git import Repo
 # Config: can be overridden by workflow env
 RSS_URL = os.getenv('RSS_URL', 'https://api.velog.io/rss/@conam')
 GIT_NAME = os.getenv('GIT_COMMIT_NAME', 'Nam-I')
-GIT_EMAIL = os.getenv('GIT_COMMIT_EMAIL', 'jamong9669@naver.com')
+GIT_EMAIL = os.getenv('GIT_COMMIT_EMAIL', '71905358+Nam-I@users.noreply.github.com')
 
 REPO_PATH = '.'
 POSTS_DIR = os.path.join(REPO_PATH, 'velog-posts')
@@ -85,7 +85,7 @@ for entry in feed.entries:
             else:
                 print('No published date in feed; using current time for commit date.')
 
-            # Commit with explicit author (ensures GitHub shows Nam-I <jamong9669@naver.com>)
+            # Commit with explicit author (ensures GitHub shows Nam-I <noreply email>)
             # Use repo.git.commit so GIT_*_DATE env vars are respected by Git
             repo.git.commit('--author', f'{GIT_NAME} <{GIT_EMAIL}>', '-m', commit_message)
             created_files.append(file_name)

@@ -51,6 +51,16 @@ def published_to_iso_with_tz(published_parsed):
 
     return dt_local.strftime('%Y-%m-%dT%H:%M:%S %z')
 
+def get_current_branch_name():
+    try:
+        if repo.head.is_detached:
+            return 'DETACHED'
+        return repo.active_branch.name
+    except Exception:
+        return 'UNKNOWN'
+
+print(f'Running update_blog.py — repo branch: {get_current_branch_name()}')
+
 feed = feedparser.parse(RSS_URL)
 created_files = []
 
@@ -62,15 +72,26 @@ for entry in feed.entries:
     if not os.path.exists(file_path):
         # write content
         with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(entry.get('description', ''))
+            # prefer content/description fields that RSS provides
+            content = entry.get('content', None)
+            if content and isinstance(content, list) and content:
+                f.write(content[0].get('value', ''))
+            else:
+                f.write(entry.get('description', '') or entry.get('summary', ''))
         print(f'Created: {file_path}')
 
         # Determine published time from RSS (published_parsed or updated_parsed)
         published_parsed = entry.get('published_parsed') or entry.get('updated_parsed')
         git_date = published_to_iso_with_tz(published_parsed)
 
-        # Stage the file
-        repo.index.add([file_path])
+        # Stage the file (use relative path to repo)
+        rel_path = os.path.relpath(file_path, REPO_PATH)
+        try:
+            repo.index.add([rel_path])
+        except Exception as e:
+            print('Failed to add file to index:', rel_path, type(e), e)
+            raise
+
         commit_message = f'Add post: {title}'
 
         # Save old env values to restore later
@@ -87,7 +108,20 @@ for entry in feed.entries:
 
             # Commit with explicit author (ensures GitHub shows Nam-I <noreply email>)
             # Use repo.git.commit so GIT_*_DATE env vars are respected by Git
-            repo.git.commit('--author', f'{GIT_NAME} <{GIT_EMAIL}>', '-m', commit_message)
+            try:
+                commit_out = repo.git.commit('--author', f'{GIT_NAME} <{GIT_EMAIL}>', '-m', commit_message)
+                print('Commit output:', commit_out)
+            except Exception as e:
+                # If commit fails (eg nothing to commit), print and continue
+                print('Commit failed:', type(e), e)
+                # show status to help debugging
+                try:
+                    print('git status --porcelain:\n', repo.git.status('--porcelain'))
+                except Exception:
+                    pass
+                # re-raise so automation surfaces the failure
+                raise
+
             created_files.append(file_name)
 
         finally:
@@ -103,10 +137,24 @@ for entry in feed.entries:
 
 if created_files:
     try:
-        origin.push()
+        # Push explicitly HEAD to main (refspec) to avoid detached-HEAD ambiguity in CI
+        push_result = repo.git.push('origin', 'HEAD:main')
+        print('Push result:', push_result)
         print(f'Pushed {len(created_files)} files: {created_files}')
     except Exception as e:
-        print('Push failed:', e)
+        print('Push failed:', type(e), e)
+        # More debug info
+        try:
+            print('=== git remote -v ===')
+            print(repo.git.remote('-v'))
+            print('=== git branch -vv ===')
+            print(repo.git.branch('-vv'))
+            print('=== git status --porcelain ===')
+            print(repo.git.status('--porcelain'))
+            print('=== git log -n 10 (pretty) ===')
+            print(repo.git.log('-n', '10', "--pretty=format:%H|%an|%ae|%ad|%s"))
+        except Exception as inner:
+            print('Additional git debug failed:', type(inner), inner)
         raise
 else:
     print('No new posts to add.')
